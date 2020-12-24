@@ -7,17 +7,20 @@ import sys
 class SecMasterInvoker():
     def get_symbol(self, symbol_name):
         symbol = {}
+        symbol['symbol'] = symbol_name
+        if symbol_name[0] == '^':
+            return symbol, False
+
         endpoint = options.secmaster.rstrip('/') + '/symbols/' + symbol_name.strip()
         response = requests.get(endpoint)
 
         if response.ok:
             data = json.loads(response.content)
-            symbol['symbol'] = symbol_name
             symbol['shortname'] = data['shortName'].encode("utf-8")
             symbol['longname'] = data['longName'].encode("utf-8")
             return symbol, True
         else:
-            return None, False
+            return symbol, False
 
     def get_exchange_symbols(self, exchange):
         symbols = []
@@ -109,21 +112,22 @@ if __name__ == '__main__':
         sql_select = "SELECT symbol FROM symbol WHERE excode = '{}'".format(options.excode)
         symbols_db = sym_db.read(sql_select)
         symbols = list(map(lambda x: x.split(':')[0], symbols_db))
+        print(" Total symbols from database: " + str(len(symbols)))
 
-        symbols_sec_master = []
+        symbols_security_master = []
         for symbol_name in symbols:
             symbol, response = sec_master.get_symbol(symbol_name)
             if response:
                 print(symbol)
-                symbols_sec_master.append(symbol)
+                symbols_security_master.append(symbol)
+        print(" Total symbols from Security Master: " + str(len(symbols_security_master)))
 
         sql_update = "UPDATE symbol SET name=:3, shortname=:2 WHERE symbol=:1"
-        for symbol, symbol_names in symbols_sec_master.items():
-            sql_update = "UPDATE symbol SET name={0}, shortname={1} WHERE symbol={2}".format(symbol_names['longname'], symbol_names['shortname'], symbol)
+        for symbol in symbols_security_master:
+            sql_update = "UPDATE symbol SET name={0}, shortname={1} WHERE symbol={2}".format(symbol['longname'], symbol['shortname'], symbol['symbol'])
             if options.dry_run:
-                print("*** Symbol Name Change [{2}] --> name: {0}, shortname: {1}".format(symbol_names['longname'], symbol_names['shortname'], symbol))
+                print("*** Symbol Name Change [{2}] --> name: {0}, shortname: {1}".format(symbol['longname'], symbol['shortname'], symbol['symbol']))
             else:
-                print("to be updated")
-                # sym_db.update(sql_update)
+                sym_db.update(sql_update)
 
     close_db(sym_db)
