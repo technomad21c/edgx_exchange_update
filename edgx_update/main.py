@@ -5,19 +5,21 @@ import argparse
 import sys
 
 class SecMasterInvoker():
+    def __init__(self, server_uri):
+        self.server_uri = server_uri.rstrip('/')
     def get_symbol(self, symbol_name):
         symbol = {}
         symbol['symbol'] = symbol_name
         if symbol_name[0] == '^':
             return symbol, False
 
-        endpoint = options.secmaster.rstrip('/') + '/symbols/' + symbol_name.strip()
+        endpoint = self.server_uri + '/symbols/' + symbol_name.strip()
         response = requests.get(endpoint)
 
         if response.ok:
             data = json.loads(response.content)
-            symbol['shortname'] = data['shortName'].encode("utf-8")
-            symbol['longname'] = data['longName'].encode("utf-8")
+            symbol['shortname'] = data['shortName']
+            symbol['longname'] = data['longName']
             return symbol, True
         else:
             return symbol, False
@@ -71,6 +73,7 @@ class SymbolDB():
 
     def update(self, query_update):
         self.cur.execute(query_update)
+        self.connection.commit()
 
     def close(self):
         if self.cur:
@@ -87,8 +90,8 @@ def getOptions(args=sys.argv[1:]):
     parser.add_argument("-s", "--sid", help="database id on DB", required=True)
     parser.add_argument("-m", "--secmaster", help="security master", required=True)
     parser.add_argument("-e", "--excode", help="exchange")
-    parser.add_argument("-n", "--names", action='store_true', help="update names")
-    parser.add_argument("--dry-run", action='store_true', help="check result without database update")
+    parser.add_argument("-n", "--names", help="update names")
+    parser.add_argument("-r", "--dry-run", help="check result without database update")
 
     options = parser.parse_args(args)
     return options
@@ -106,9 +109,12 @@ if __name__ == '__main__':
     options = getOptions(sys.argv[1:])
 
     sym_db = connect_db(options.dbserver, options.port, options.sid, options.username, options.password)
-    sec_master = SecMasterInvoker()
+    sec_master = SecMasterInvoker(options.secmaster)
 
-    if options.names and options.excode == 'EDGX':
+    is_dry_run = options.dry_run.lower() in ('yes', 'true', 'y', 't')
+    is_name_update = options.names.lower() in ('yes', 'true', 'y', 't')
+
+    if is_name_update and options.excode == 'EDGX':
         sql_select = "SELECT symbol FROM symbol WHERE excode = '{}'".format(options.excode)
         symbols_db = sym_db.read(sql_select)
         symbols = list(map(lambda x: x.split(':')[0], symbols_db))
@@ -122,11 +128,13 @@ if __name__ == '__main__':
                 symbols_security_master.append(symbol)
         print(" Total symbols from Security Master: " + str(len(symbols_security_master)))
 
-        sql_update = "UPDATE symbol SET name=:3, shortname=:2 WHERE symbol=:1"
+        sql_update = None
         for symbol in symbols_security_master:
-            sql_update = "UPDATE symbol SET name={0}, shortname={1} WHERE symbol={2}".format(symbol['longname'], symbol['shortname'], symbol['symbol'])
-            if options.dry_run:
-                print("*** Symbol Name Change [{2}] --> name: {0}, shortname: {1}".format(symbol['longname'], symbol['shortname'], symbol['symbol']))
+            sql_update = "UPDATE symbol SET name='{0}', shortname='{1}' WHERE symbol='{2}'"\
+                .format(symbol['longname'], symbol['shortname'], symbol['symbol'] + ':EGX')
+            if is_dry_run:
+                print("*** Symbol Name Change [{2}] --> name: '{0}', shortname: '{1}'"
+                      .format(symbol['longname'], symbol['shortname'], symbol['symbol'] + ':EGX'))
             else:
                 sym_db.update(sql_update)
 
