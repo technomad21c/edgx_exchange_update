@@ -91,7 +91,7 @@ def getOptions(args=sys.argv[1:]):
     parser.add_argument("-m", "--secmaster", help="security master", required=True)
     parser.add_argument("-e", "--excode", help="exchange")
     parser.add_argument("-n", "--names", help="update names")
-    parser.add_argument("-r", "--dry-run", help="check result without database update")
+    parser.add_argument("-r", "--dry-run", nargs='?', default='false', help="check result without database update")
 
     options = parser.parse_args(args)
     return options
@@ -111,7 +111,11 @@ if __name__ == '__main__':
     sym_db = connect_db(options.dbserver, options.port, options.sid, options.username, options.password)
     sec_master = SecMasterInvoker(options.secmaster)
 
-    is_dry_run = options.dry_run.lower() in ('yes', 'true', 'y', 't')
+
+    if options.dry_run is None:
+        is_dry_run = False
+    else:
+        is_dry_run = options.dry_run.lower() in ('yes', 'true', 'y', 't')
     is_name_update = options.names.lower() in ('yes', 'true', 'y', 't')
 
     if is_name_update and options.excode == 'EDGX':
@@ -136,6 +140,7 @@ if __name__ == '__main__':
                 print("*** Symbol Name Change [{2}] --> name: '{0}', shortname: '{1}'"
                       .format(symbol['longname'], symbol['shortname'], symbol['symbol'] + ':EGX'))
             else:
-                sym_db.update(sql_update)
+                print('dry run false')
+                # sym_db.update(sql_update)
 
     close_db(sym_db)
