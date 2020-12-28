@@ -140,7 +140,6 @@ if __name__ == '__main__':
                 print("*** Symbol Name Change [{2}] --> name: '{0}', shortname: '{1}'"
                       .format(symbol['longname'], symbol['shortname'], symbol['symbol'] + ':EGX'))
             else:
-                print('dry run false')
-                # sym_db.update(sql_update)
+                sym_db.update(sql_update)
 
     close_db(sym_db)
