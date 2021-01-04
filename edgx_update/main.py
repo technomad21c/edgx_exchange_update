@@ -14,7 +14,11 @@ class SecMasterInvoker():
             return symbol, False
 
         endpoint = self.server_uri + '/symbols/' + symbol_name.strip()
-        response = requests.get(endpoint)
+        try:
+            response = requests.get(endpoint)
+        except requests.exceptions.RequestException as error:
+            print("Error: ", error)
+            return None, False
 
         if response.ok:
             data = json.loads(response.content)
