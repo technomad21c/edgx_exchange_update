@@ -69,11 +69,14 @@ class SymbolDB():
 
     def read(self, query_select):
         symbols = []
+        symbols_name = {}
         self.cur.execute(query_select)
         for symbol in self.cur:
             symbols.append(symbol[0])
+            name = [symbol[1] or "", symbol[2] or ""]
+            symbols_name[symbol[0]] = name
 
-        return symbols
+        return symbols, symbols_name
 
     def update(self, query_update):
         self.cur.execute(query_update)
@@ -95,7 +98,8 @@ def getOptions(args=sys.argv[1:]):
     parser.add_argument("-m", "--secmaster", help="security master", required=True)
     parser.add_argument("-e", "--excode", help="exchange")
     parser.add_argument("-n", "--names", help="update names")
-    parser.add_argument("-r", "--dry-run", nargs='?', default='false', help="check result without database update")
+    parser.add_argument("-r", "--dry"
+                              "-run", nargs='?', default='false', help="check result without database update")
 
     options = parser.parse_args(args)
     return options
@@ -123,17 +127,17 @@ if __name__ == '__main__':
     is_name_update = options.names.lower() in ('yes', 'true', 'y', 't')
 
     if is_name_update and options.excode == 'EDGX':
-        sql_select = "SELECT symbol FROM symbol WHERE excode = '{}'".format(options.excode)
-        symbols_db = sym_db.read(sql_select)
+        sql_select = "SELECT symbol, shortname, name FROM symbol WHERE excode = '{}'".format(options.excode)
+        symbols_db, symbols_name_db = sym_db.read(sql_select)
         symbols = list(map(lambda x: x.split(':')[0], symbols_db))
-        print(" Total symbols from database: " + str(len(symbols)))
+        print(" Total symbols from database: " + str(len(symbols_db)))
 
         symbols_security_master = []
-        for symbol_name in symbols:
-            symbol, response = sec_master.get_symbol(symbol_name)
+        for symbol in symbols:
+            symbol_sm, response = sec_master.get_symbol(symbol)
             if response:
-                print(symbol)
-                symbols_security_master.append(symbol)
+                print("--- Symbol retrieved from Security Master: " + symbol)
+                symbols_security_master.append(symbol_sm)
         print(" Total symbols from Security Master: " + str(len(symbols_security_master)))
 
         sql_update = None
@@ -141,8 +145,10 @@ if __name__ == '__main__':
             sql_update = "UPDATE symbol SET name='{0}', shortname='{1}' WHERE symbol='{2}'"\
                 .format(symbol['longname'], symbol['shortname'], symbol['symbol'] + ':EGX')
             if is_dry_run:
-                print("*** Symbol Name Change [{2}] --> name: '{0}', shortname: '{1}'"
-                      .format(symbol['longname'], symbol['shortname'], symbol['symbol'] + ':EGX'))
+                print("*** Symbol Name Change [{0:^12}] --> shortname: \"{1}\" --> \"{2}\""
+                      .format(symbol['symbol'] + ':EGX', symbols_name_db[symbol['symbol'] + ':EGX'][0], symbol['shortname']))
+                print("                                          name: \"{1}\" --> \"{2}\""
+                      .format(symbol['symbol'] + ':EGX', symbols_name_db[symbol['symbol'] + ':EGX'][1], symbol['longname']))
             else:
                 sym_db.update(sql_update)
 
