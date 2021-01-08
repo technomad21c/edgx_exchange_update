@@ -127,7 +127,7 @@ if __name__ == '__main__':
     is_name_update = options.names.lower() in ('yes', 'true', 'y', 't')
 
     if is_name_update and options.excode == 'EDGX':
-        sql_select = "SELECT symbol, shortname, name FROM symbol WHERE excode = '{}'".format(options.excode)
+        sql_select = "SELECT symbol, shortname, name FROM history.symbol WHERE excode = '{}'".format(options.excode)
         symbols_db, symbols_name_db = sym_db.read(sql_select)
         symbols = list(map(lambda x: x.split(':')[0], symbols_db))
         print(" Total symbols from database: " + str(len(symbols_db)))
@@ -151,5 +151,11 @@ if __name__ == '__main__':
                       .format(symbol['symbol'] + ':EGX', symbols_name_db[symbol['symbol'] + ':EGX'][1], symbol['longname']))
             else:
                 sym_db.update(sql_update)
+                print("*** Symbol Name Change [{0:^12}] --> shortname: \"{1}\" --> \"{2}\""
+                      .format(symbol['symbol'] + ':EGX', symbols_name_db[symbol['symbol'] + ':EGX'][0],
+                              symbol['shortname']))
+                print("                                          name: \"{1}\" --> \"{2}\""
+                      .format(symbol['symbol'] + ':EGX', symbols_name_db[symbol['symbol'] + ':EGX'][1],
+                              symbol['longname']))
 
     close_db(sym_db)
